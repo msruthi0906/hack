@@ -91,7 +91,7 @@ def save_to_excel(results):
 # ---------- STREAMLIT APP ----------
 
 st.set_page_config(page_title="Resume Matcher", layout="centered")
-st.title("📄 Automated Resume Matcher with Section Selection")
+st.title("📄 Automated Resume Matcher")
 
 st.sidebar.header("Upload Files")
 jd_file = st.sidebar.file_uploader("Upload Job Description (PDF/DOCX)", type=['pdf', 'docx'])
