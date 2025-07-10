@@ -1,5 +1,5 @@
 import streamlit as st
-import fitz
+import fitz  # PyMuPDF
 import docx2txt
 import os
 import re
@@ -37,38 +37,35 @@ def extract_sections(text):
     sections = {
         "skills": "",
         "experience": "",
-        "education": ""
+        "education": "",
+        "achievements": ""
     }
 
     text_lower = text.lower()
-    skill_idx = text_lower.find("skill")
-    exp_idx = text_lower.find("experience")
-    edu_idx = text_lower.find("education")
+    idxs = {
+        "skills": text_lower.find("skill"),
+        "experience": text_lower.find("experience"),
+        "education": text_lower.find("education"),
+        "achievements": text_lower.find("achievement")
+    }
 
-    indexes = sorted([(skill_idx, 'skills'), (exp_idx, 'experience'), (edu_idx, 'education')])
-    indexes = [(i, sec) for i, sec in indexes if i != -1]
-
-    if not indexes:
-        return sections  # All sections empty
-
-    for i in range(len(indexes)):
-        start_idx = indexes[i][0]
-        sec = indexes[i][1]
-        end_idx = indexes[i+1][0] if i+1 < len(indexes) else len(text)
-        section_text = text[start_idx:end_idx]
-        sections[sec] = preprocess_text(section_text)
+    sorted_idxs = sorted([(i, s) for s, i in idxs.items() if i != -1])
+    for i in range(len(sorted_idxs)):
+        start_idx, sec = sorted_idxs[i]
+        end_idx = sorted_idxs[i + 1][0] if i + 1 < len(sorted_idxs) else len(text)
+        sections[sec] = preprocess_text(text[start_idx:end_idx])
 
     return sections
 
-# ---------- MATCHING FUNCTION ----------
+# ---------- MATCHING LOGIC ----------
 
-def match_sections(jd_sections, resume_sections, weights={'skills': 0.4, 'experience': 0.4, 'education': 0.2}):
+def match_sections(jd_sections, resume_sections, weights):
     total_score = 0.0
     section_scores = {}
 
-    for section in jd_sections.keys():
-        jd_text = jd_sections[section]
-        resume_text = resume_sections[section]
+    for section in weights:
+        jd_text = jd_sections.get(section, "")
+        resume_text = resume_sections.get(section, "")
 
         if jd_text.strip() == "" or resume_text.strip() == "":
             score = 0
@@ -82,7 +79,7 @@ def match_sections(jd_sections, resume_sections, weights={'skills': 0.4, 'experi
 
     return total_score, section_scores
 
-# ---------- EXCEL OUTPUT ----------
+# ---------- EXCEL EXPORT ----------
 
 def save_to_excel(results):
     df = pd.DataFrame(results)
@@ -94,15 +91,39 @@ def save_to_excel(results):
 # ---------- STREAMLIT APP ----------
 
 st.set_page_config(page_title="Resume Matcher", layout="centered")
-st.title("📄 Automated Resume Matcher with Section-wise Analysis")
+st.title("📄 Automated Resume Matcher with Section Selection")
 
 st.sidebar.header("Upload Files")
 jd_file = st.sidebar.file_uploader("Upload Job Description (PDF/DOCX)", type=['pdf', 'docx'])
 resume_files = st.sidebar.file_uploader("Upload Resumes (PDF/DOCX)", type=['pdf', 'docx'], accept_multiple_files=True)
 
+# Section selection
+aspects = st.sidebar.multiselect(
+    "🔍 Choose Resume Sections to Match",
+    ["Skills", "Experience", "Education", "Achievements"],
+    default=["Skills", "Experience", "Education"]
+)
+
+aspect_map = {
+    "Skills": "skills",
+    "Experience": "experience",
+    "Education": "education",
+    "Achievements": "achievements"
+}
+
+selected_sections = [aspect_map[a] for a in aspects]
+
+# Create weights dynamically
+if selected_sections:
+    weights = {sec: 1 / len(selected_sections) for sec in selected_sections}
+else:
+    weights = {}
+
 if st.sidebar.button("🔍 Match Resumes"):
     if not jd_file or not resume_files:
         st.warning("Please upload both job description and at least one resume.")
+    elif not selected_sections:
+        st.warning("Please select at least one section to match.")
     else:
         jd_raw = extract_text(jd_file)
         jd_sections = extract_sections(jd_raw)
@@ -112,15 +133,16 @@ if st.sidebar.button("🔍 Match Resumes"):
         for resume in resume_files:
             resume_raw = extract_text(resume)
             resume_sections = extract_sections(resume_raw)
-            total_score, section_scores = match_sections(jd_sections, resume_sections)
+            total_score, section_scores = match_sections(jd_sections, resume_sections, weights)
 
-            results.append({
+            result = {
                 "Resume Name": resume.name,
-                "Total Match Score": round(total_score, 2),
-                "Skills Score": round(section_scores['skills'], 2),
-                "Experience Score": round(section_scores['experience'], 2),
-                "Education Score": round(section_scores['education'], 2)
-            })
+                "Total Match Score": round(total_score, 2)
+            }
+            for sec in selected_sections:
+                result[f"{sec.capitalize()} Score"] = round(section_scores[sec], 2)
+
+            results.append(result)
 
         sorted_results = sorted(results, key=lambda x: x["Total Match Score"], reverse=True)
 
@@ -132,6 +154,6 @@ if st.sidebar.button("🔍 Match Resumes"):
         st.download_button(
             label="📥 Download Excel Report",
             data=excel_data,
-            file_name='sectionwise_resume_match_results.xlsx',
+            file_name='resume_match_results.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
