@@ -6,5 +6,4 @@ PyMuPDF
 python-docx
 docx2txt
 pandas
-xlsxwriter
 openpyxl
