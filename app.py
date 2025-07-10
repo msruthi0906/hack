@@ -43,9 +43,9 @@ def match_resumes(jd_text, resumes):
 def save_to_excel(results):
     df = pd.DataFrame(results, columns=['Resume Name', 'Match Score'])
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+   with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Match Results')
-    processed_data = output.getvalue()
+        processed_data = output.getvalue()
     return processed_data
 
 # --- Streamlit UI ---
