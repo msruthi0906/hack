@@ -52,22 +52,33 @@ def extract_sections(text):
         "objective": "",
         "interests": ""
     }
+
     text_lower = text.lower()
-    idxs = {
-        "skills": text_lower.find("skill"),
-        "experience": text_lower.find("experience"),
-        "education": text_lower.find("education"),
-        "achievements": text_lower.find("achievement"),
-        "projects": text_lower.find("project"),
-        "certifications": text_lower.find("certification"),
-        "objective": text_lower.find("objective"),
-        "interests": text_lower.find("interest")
+
+    patterns = {
+        "skills": r"skills?",
+        "experience": r"(work\s)?experience|employment",
+        "education": r"education|academic\sbackground|qualification",
+        "achievements": r"achievements?|accomplishments?",
+        "projects": r"projects?",
+        "certifications": r"certifications?|courses?",
+        "objective": r"objective|summary|career\sobjective",
+        "interests": r"interests?|hobbies?"
     }
-    sorted_idxs = sorted([(i, s) for s, i in idxs.items() if i != -1])
-    for i in range(len(sorted_idxs)):
-        start_idx, sec = sorted_idxs[i]
-        end_idx = sorted_idxs[i + 1][0] if i + 1 < len(sorted_idxs) else len(text)
-        sections[sec] = preprocess_text(text[start_idx:end_idx])
+
+    found_sections = []
+    for sec, pat in patterns.items():
+        match = re.search(pat, text_lower)
+        if match:
+            found_sections.append((match.start(), sec))
+
+    found_sections.sort()
+
+    for i, (start_idx, sec) in enumerate(found_sections):
+        end_idx = found_sections[i + 1][0] if i + 1 < len(found_sections) else len(text)
+        raw_section = text[start_idx:end_idx]
+        sections[sec] = preprocess_text(raw_section)
+
     return sections
 
 # ---------- MATCHING LOGIC ----------
@@ -120,9 +131,9 @@ with tab1:
             resume_files = st.file_uploader("Upload Resumes (PDF/DOCX)", type=['pdf', 'docx'], accept_multiple_files=True)
 
     aspects = st.multiselect(
-        "Choose Resume Sections to Match (optional)",
+        "Choose Resume Sections to Match",
         ["Skills", "Experience", "Education", "Achievements", "Projects", "Certifications", "Objective", "Interests"],
-        default=[]
+        default=["Skills", "Experience", "Education"]
     )
 
     min_score_input = st.text_input("Set Minimum Qualification Score (%) (optional)")
@@ -175,14 +186,17 @@ with tab1:
                 href = f'<a href="data:application/{ext};base64,{encoded}" download="{resume.name}" target="_blank">{resume.name}</a>'
 
                 result = {"Resume": href}
-                if len(selected_sections) > 1 or not selected_sections:
+                if len(selected_sections) > 1:
                     result["Total Match Score (%)"] = round(total_score * 100, 2)
                 for sec in selected_sections:
                     result[f"{sec.capitalize()} Score (%)"] = round(section_scores.get(sec, 0.0) * 100, 2)
 
                 results.append(result)
-
-            sort_key = "Total Match Score (%)" if not selected_sections or len(selected_sections) > 1 else f"{selected_sections[0].capitalize()} Score (%)"
+                if not selected_sections:
+                    st.error("Please select at least one resume section to match.")
+                    st.stop()
+                else:
+                    sort_key = "Total Match Score (%)" if len(selected_sections) > 1 else f"{selected_sections[0].capitalize()} Score (%)"
             sorted_results = sorted(results, key=lambda x: x.get(sort_key, 0), reverse=True)
             st.session_state["results"] = sorted_results
             if min_score is not None:
@@ -222,7 +236,7 @@ with tab2:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
 
-        if len(selected_sections) > 1 or not selected_sections:
+        if len(selected_sections) > 1:
             st.markdown(f"*Highest Score:* {max([r['Total Match Score (%)'] for r in sorted_results]):.2f}%")
             st.markdown(f"*Average Score:* {sum([r['Total Match Score (%)'] for r in sorted_results])/len(sorted_results):.2f}%")
 
