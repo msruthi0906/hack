@@ -120,9 +120,9 @@ with tab1:
             resume_files = st.file_uploader("Upload Resumes (PDF/DOCX)", type=['pdf', 'docx'], accept_multiple_files=True)
 
     aspects = st.multiselect(
-        "Choose Resume Sections to Match",
+        "Choose Resume Sections to Match (optional)",
         ["Skills", "Experience", "Education", "Achievements", "Projects", "Certifications", "Objective", "Interests"],
-        default=["Skills", "Experience", "Education"]
+        default=[]
     )
 
     min_score_input = st.text_input("Set Minimum Qualification Score (%) (optional)")
@@ -175,17 +175,14 @@ with tab1:
                 href = f'<a href="data:application/{ext};base64,{encoded}" download="{resume.name}" target="_blank">{resume.name}</a>'
 
                 result = {"Resume": href}
-                if len(selected_sections) > 1:
+                if len(selected_sections) > 1 or not selected_sections:
                     result["Total Match Score (%)"] = round(total_score * 100, 2)
                 for sec in selected_sections:
                     result[f"{sec.capitalize()} Score (%)"] = round(section_scores.get(sec, 0.0) * 100, 2)
 
                 results.append(result)
-                if not selected_sections:
-                    st.error("Please select at least one resume section to match.")
-                    st.stop()
-                else:
-                    sort_key = "Total Match Score (%)" if len(selected_sections) > 1 else f"{selected_sections[0].capitalize()} Score (%)"
+
+            sort_key = "Total Match Score (%)" if not selected_sections or len(selected_sections) > 1 else f"{selected_sections[0].capitalize()} Score (%)"
             sorted_results = sorted(results, key=lambda x: x.get(sort_key, 0), reverse=True)
             st.session_state["results"] = sorted_results
             if min_score is not None:
@@ -225,7 +222,7 @@ with tab2:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
 
-        if len(selected_sections) > 1:
+        if len(selected_sections) > 1 or not selected_sections:
             st.markdown(f"*Highest Score:* {max([r['Total Match Score (%)'] for r in sorted_results]):.2f}%")
             st.markdown(f"*Average Score:* {sum([r['Total Match Score (%)'] for r in sorted_results])/len(sorted_results):.2f}%")
 
