@@ -173,7 +173,6 @@ with tab1:
             jd_sections = extract_sections(jd_raw)
             jd_full_text = preprocess_text(jd_raw)
 
-            # Show extracted JD Education section (debugging)
             st.subheader("JD Education Extracted:")
             st.text(jd_sections.get("education", "[No education section found]"))
 
@@ -206,11 +205,12 @@ with tab1:
                     result[f"{sec.capitalize()} Score (%)"] = round(section_scores.get(sec, 0.0) * 100, 2)
 
                 results.append(result)
-                if not selected_sections:
-                    st.error("Please select at least one resume section to match.")
-                    st.stop()
-                else:
-                    sort_key = "Total Match Score (%)" if len(selected_sections) > 1 else f"{selected_sections[0].capitalize()} Score (%)"
+
+            if not selected_sections:
+                st.error("Please select at least one resume section to match.")
+                st.stop()
+
+            sort_key = "Total Match Score (%)" if len(selected_sections) > 1 else f"{selected_sections[0].capitalize()} Score (%)"
             sorted_results = sorted(results, key=lambda x: x.get(sort_key, 0), reverse=True)
             st.session_state["results"] = sorted_results
             if min_score is not None:
@@ -250,9 +250,18 @@ with tab2:
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
 
-        if len(selected_sections) > 1:
-            st.markdown(f"*Highest Score:* {max([r['Total Match Score (%)'] for r in sorted_results]):.2f}%")
-            st.markdown(f"*Average Score:* {sum([r['Total Match Score (%)'] for r in sorted_results])/len(sorted_results):.2f}%")
+        # Fix dynamic score selection for single/multiple section cases
+        if sorted_results:
+            if "Total Match Score (%)" in sorted_results[0]:
+                score_key = "Total Match Score (%)"
+            else:
+                score_key = next((k for k in sorted_results[0] if k.endswith("Score (%)") and k != "Resume"), None)
+
+            if score_key:
+                highest = max([r[score_key] for r in sorted_results])
+                average = sum([r[score_key] for r in sorted_results]) / len(sorted_results)
+                st.markdown(f"*Highest {score_key}:* {highest:.2f}%")
+                st.markdown(f"*Average {score_key}:* {average:.2f}%")
 
 st.markdown("""
 ---
