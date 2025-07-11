@@ -58,7 +58,7 @@ def extract_sections(text):
     patterns = {
         "skills": r"skills?",
         "experience": r"(work\s)?experience|employment",
-        "education": r"education|academic\sbackground|qualification",
+        "education": r"education|academic\sbackground|qualification|academic\sdetails|scholastic|studies|educational\sprofile|educational\sbackground",
         "achievements": r"achievements?|accomplishments?",
         "projects": r"projects?",
         "certifications": r"certifications?|courses?",
@@ -89,12 +89,21 @@ def match_sections(jd_sections, resume_sections, weights):
     for section in weights:
         jd_text = jd_sections.get(section, "")
         resume_text = resume_sections.get(section, "")
+
+        # Fallbacks for blank sections
+        if section == "education" and not jd_text.strip():
+            jd_text = "bachelor master degree b.tech bsc msc university college academic school"
+
+        if section == "education" and not resume_text.strip():
+            resume_text = "bachelor master degree b.tech bsc msc university college academic school"
+
         if jd_text.strip() == "" or resume_text.strip() == "":
             score = 0
         else:
             vectorizer = TfidfVectorizer()
             tfidf = vectorizer.fit_transform([jd_text, resume_text])
             score = cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
+
         section_scores[section] = score
         total_score += weights[section] * score
     return total_score, section_scores
@@ -163,6 +172,11 @@ with tab1:
             jd_raw = extract_text(jd_file)
             jd_sections = extract_sections(jd_raw)
             jd_full_text = preprocess_text(jd_raw)
+
+            # Show extracted JD Education section (debugging)
+            st.subheader("JD Education Extracted:")
+            st.text(jd_sections.get("education", "[No education section found]"))
+
             results = []
             resume_bytes_dict = {r.name: r.read() for r in resume_files}
 
